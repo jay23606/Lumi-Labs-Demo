@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TaskStore } from "../src/store.js";
+import { TaskStore, ValidationError } from "../src/store.js";
 
 test("create assigns an id and defaults done to false", () => {
   const store = new TaskStore();
@@ -20,4 +20,10 @@ test("delete removes the task", () => {
   const { id } = store.create({ title: "Temp" });
   assert.equal(store.delete(id), true);
   assert.equal(store.get(id), null);
+});
+
+test("create rejects a missing or blank title", () => {
+  const store = new TaskStore();
+  assert.throws(() => store.create({}), ValidationError);
+  assert.throws(() => store.create({ title: "   " }), ValidationError);
 });
