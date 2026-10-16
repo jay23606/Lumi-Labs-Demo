@@ -1,13 +1,18 @@
 import { randomUUID } from "node:crypto";
 
+export class ValidationError extends Error {}
+
 /** In-memory task store. Swap for a database later. */
 export class TaskStore {
   #tasks = new Map();
 
   create({ title }) {
+    if (typeof title !== "string" || title.trim() === "") {
+      throw new ValidationError("title is required");
+    }
     const task = {
       id: randomUUID(),
-      title,
+      title: title.trim(),
       done: false,
       createdAt: new Date().toISOString(),
     };

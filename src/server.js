@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { TaskStore } from "./store.js";
+import { TaskStore, ValidationError } from "./store.js";
 
 const store = new TaskStore();
 
@@ -40,8 +40,9 @@ export function createApp(taskStore = store) {
           : send(res, 404, { error: "Not found" });
       }
       send(res, 405, { error: "Method not allowed" });
-    } catch {
-      send(res, 400, { error: "Invalid JSON" });
+    } catch (err) {
+      const message = err instanceof ValidationError ? err.message : "Invalid JSON";
+      send(res, 400, { error: message });
     }
   });
 }
