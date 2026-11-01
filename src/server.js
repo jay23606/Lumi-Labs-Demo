@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { TaskStore, ValidationError } from "./store.js";
+import { TaskStore, ValidationError, BadJsonError, PRIORITIES } from "./store.js";
 
 const store = new TaskStore();
 
@@ -11,7 +11,12 @@ function send(res, status, body) {
 async function readJson(req) {
   let raw = "";
   for await (const chunk of req) raw += chunk;
-  return raw ? JSON.parse(raw) : {};
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new BadJsonError("Request body must be valid JSON");
+  }
 }
 
 export function createApp(taskStore = store) {
@@ -19,10 +24,22 @@ export function createApp(taskStore = store) {
     const url = new URL(req.url, "http://localhost");
     const [, resource, id] = url.pathname.split("/");
 
+    if (resource === "health" && req.method === "GET") return send(res, 200, { status: "ok" });
     if (resource !== "tasks") return send(res, 404, { error: "Not found" });
 
     try {
-      if (req.method === "GET" && !id) return send(res, 200, taskStore.list());
+      if (req.method === "GET" && !id) {
+        const q = url.searchParams;
+        const priority = q.get("priority") ?? undefined;
+        if (priority !== undefined && !PRIORITIES.includes(priority)) {
+          throw new ValidationError(`priority must be one of: ${PRIORITIES.join(", ")}`);
+        }
+        const done = q.get("done");
+        if (done !== null && done !== "true" && done !== "false") {
+          throw new ValidationError("done must be true or false");
+        }
+        return send(res, 200, taskStore.list({ priority, done: done === null ? undefined : done === "true" }));
+      }
       if (req.method === "POST" && !id) {
         return send(res, 201, taskStore.create(await readJson(req)));
       }
@@ -41,8 +58,11 @@ export function createApp(taskStore = store) {
       }
       send(res, 405, { error: "Method not allowed" });
     } catch (err) {
-      const message = err instanceof ValidationError ? err.message : "Invalid JSON";
-      send(res, 400, { error: message });
+      if (err instanceof ValidationError || err instanceof BadJsonError) {
+        return send(res, 400, { error: err.message });
+      }
+      console.error(err);
+      send(res, 500, { error: "Internal server error" });
     }
   });
 }

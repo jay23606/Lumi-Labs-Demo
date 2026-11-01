@@ -15,6 +15,7 @@ function normalizeTags(tags = []) {
 }
 
 export class ValidationError extends Error {}
+export class BadJsonError extends Error {}
 
 /** In-memory task store. Swap for a database later. */
 export class TaskStore {
@@ -43,8 +44,12 @@ export class TaskStore {
     return this.#tasks.get(id) ?? null;
   }
 
-  list() {
-    return [...this.#tasks.values()];
+  list({ priority, done } = {}) {
+    return [...this.#tasks.values()].filter(
+      (t) =>
+        (priority === undefined || t.priority === priority) &&
+        (done === undefined || t.done === done),
+    );
   }
 
   update(id, changes) {
